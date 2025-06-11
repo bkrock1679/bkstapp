@@ -5,29 +5,30 @@ import requests
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="centered")
-st.title("📈 Stock Insights — 6-Week Snapshot with News")
 
+st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
-# NewsAPI setup
-news_api_key = st.secrets["newsapi"]["key"]
-news_url = "https://newsapi.org/v2/everything"
+# Marketaux API key from Streamlit secrets
+marketaux_api_key = st.secrets["marketaux"]["key"]
 
-def get_news(query, from_date, to_date):
+def get_news_marketaux(symbol, from_date, to_date, api_key):
+    url = "https://api.marketaux.com/v1/news/all"
     params = {
-        "q": query,
-        "from": from_date,
-        "to": to_date,
+        "symbols": symbol,
+        "filter_entities": "true",
         "language": "en",
-        "sortBy": "relevancy",
-        "apiKey": news_api_key,
-        "pageSize": 5,
+        "published_on.min": from_date,
+        "published_on.max": to_date,
+        "api_token": api_key,
+        "limit": 5,
     }
-    response = requests.get(news_url, params=params)
+    response = requests.get(url, params=params)
     if response.status_code == 200:
-        return response.json().get("articles", [])
+        data = response.json()
+        return data.get("data", [])
     else:
-        st.warning(f"News API Error: {response.status_code}")
+        st.warning(f"Marketaux API Error: {response.status_code} - {response.text}")
         return []
 
 if st.button("Get Stock Insights"):
@@ -46,12 +47,6 @@ if st.button("Get Stock Insights"):
             hist.index = hist.index.date
             st.dataframe(hist[::-1], use_container_width=True)
 
-            # Attempt to get full company name
-            try:
-                company_name = stock.info.get("shortName", symbol)
-            except Exception:
-                company_name = symbol
-
             st.subheader("⚠️ Section 2: Volatility & Related News")
             hist['% Change'] = hist['Close'].pct_change() * 100
             spikes = hist[hist['% Change'].abs() > 5].copy()
@@ -61,11 +56,13 @@ if st.button("Get Stock Insights"):
             if spikes.empty:
                 st.info("No major price swings (>5%) in the last 6 weeks.")
             else:
-                for date, row in spikes[::-1].iterrows():
+                # To save API calls, only fetch news for the most recent spike
+                recent_spike = spikes.tail(1)
+                for date, row in recent_spike[::-1].iterrows():
                     date_str = date.isoformat()
                     next_day_str = (datetime.fromisoformat(date_str) + timedelta(days=1)).strftime('%Y-%m-%d')
                     st.write(f"### {date_str} — {row['Direction']}ward move of {row['% Change']}%")
-                    headlines = get_news(company_name, date_str, next_day_str)
+                    headlines = get_news_marketaux(symbol, date_str, next_day_str, marketaux_api_key)
                     if headlines:
                         for article in headlines:
                             st.markdown(f"- [{article['title']}]({article['url']})")
@@ -74,8 +71,7 @@ if st.button("Get Stock Insights"):
 
             st.subheader("📰 Live News: Latest Headlines")
             today_str = datetime.today().strftime('%Y-%m-%d')
-            tomorrow_str = (datetime.today() + timedelta(days=1)).strftime('%Y-%m-%d')
-            news_today = get_news(company_name, today_str, tomorrow_str)
+            news_today = get_news_marketaux(symbol, today_str, today_str, marketaux_api_key)
             if news_today:
                 for article in news_today:
                     st.markdown(f"- [{article['title']}]({article['url']})")
