@@ -1,76 +1,97 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import requests
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Stock Insights Tool", layout="centered")
+st.set_page_config(page_title="Stock Price & Gap Dashboard", layout="wide")
 
-st.title("📈 Stock Insights — 6-Week Snapshot with News")
-symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
-
-# NewsAPI setup
-news_api_key = st.secrets["newsapi"]["key"]
-news_url = "https://newsapi.org/v2/everything"
-
-def get_news(query, from_date, to_date):
-    params = {
-        "q": query,
-        "from": from_date,
-        "to": to_date,
-        "language": "en",
-        "sortBy": "relevancy",
-        "apiKey": news_api_key,
-        "pageSize": 5,
+# CSS for center alignment & some light styling
+st.markdown(
+    """
+    <style>
+    .stApp {
+        background-color: #f0f8ff;
     }
-    response = requests.get(news_url, params=params)
-    if response.status_code == 200:
-        return response.json().get("articles", [])
-    else:
-        return []
+    .title {
+        color: #007acc;
+        font-size: 36px;
+        font-weight: 700;
+        padding-bottom: 15px;
+        text-align: center;
+    }
+    .section-header {
+        color: #004c99;
+        font-size: 24px;
+        font-weight: 600;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    .dataframe td, .dataframe th {
+        text-align: center !important;
+    }
+    .dataframe th {
+        background-color: #cce6ff !important;
+        color: #003366 !important;
+    }
+    .dataframe td {
+        background-color: #e6f0ff !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
-if st.button("Get Stock Insights"):
+def add_gap_columns(df):
+    df = df.copy()
+    df["PrevClose"] = df["Close"].shift(1)
+    df["Gap"] = df["Open"] - df["PrevClose"]
+    df["GapDirection"] = df["Gap"].apply(lambda x: "Gap Up" if x > 0 else ("Gap Down" if x < 0 else "No Gap"))
+    df.drop(columns=["PrevClose"], inplace=True)
+    return df
+
+def get_stock_data(symbol, weeks=6):
+    ticker = yf.Ticker(symbol)
+    
+    end_date = datetime.today()
+    start_date = end_date - timedelta(weeks=weeks)
+    
+    df = ticker.history(start=start_date.strftime("%Y-%m-%d"), end=end_date.strftime("%Y-%m-%d"), interval="1d")
+    df.reset_index(inplace=True)
+    
+    # Reverse order: newest dates first
+    df = df.iloc[::-1].reset_index(drop=True)
+    
+    # Keep only needed columns for display
+    df = df[["Date", "Open", "High", "Low", "Close"]]
+    
+    df = add_gap_columns(df)
+    
+    # Format Date column as string for better display
+    df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
+    
+    # Round numeric columns for neatness
+    for col in ["Open", "High", "Low", "Close", "Gap"]:
+        df[col] = df[col].round(2)
+    
+    return df
+
+st.markdown('<h1 class="title">Stock Price & Gap Dashboard</h1>', unsafe_allow_html=True)
+
+stock_symbol = st.text_input("Enter Stock Symbol (e.g. AAPL, MSFT):", value="AAPL").upper()
+
+if stock_symbol:
     try:
-        end_date = datetime.today()
-        start_date = end_date - timedelta(weeks=6)
-
-        stock = yf.Ticker(symbol)
-        hist = stock.history(start=start_date, end=end_date)
-        hist = hist[['Open', 'High', 'Low', 'Close']].round(2)
-
-        if hist.empty:
-            st.error("No data found for this symbol.")
-        else:
-            st.subheader("📊 Section 1: Daily Prices (Recent First)")
-            hist.index = hist.index.date
-            st.dataframe(hist[::-1], use_container_width=True)
-
-            st.subheader("⚠️ Section 2: Volatility & Related News")
-            hist['% Change'] = hist['Close'].pct_change() * 100
-            spikes = hist[hist['% Change'].abs() > 5].copy()
-            spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
-            spikes = spikes[['% Change', 'Direction']].round(2)
-
-            if spikes.empty:
-                st.info("No major price swings (>5%) in the last 6 weeks.")
-            else:
-                for date, row in spikes[::-1].iterrows():
-                    st.write(f"### {date} — {row['Direction']}ward move of {row['% Change']}%")
-                    headlines = get_news(symbol, date.strftime('%Y-%m-%d'), date.strftime('%Y-%m-%d'))
-                    if headlines:
-                        for article in headlines:
-                            st.markdown(f"- [{article['title']}]({article['url']})")
-                    else:
-                        st.write("No news found for this date.")
-
-            st.subheader("📰 Live News: Latest Headlines")
-            today_str = datetime.today().strftime('%Y-%m-%d')
-            news_today = get_news(symbol, today_str, today_str)
-            if news_today:
-                for article in news_today:
-                    st.markdown(f"- [{article['title']}]({article['url']})")
-            else:
-                st.write("No recent news found today.")
-
+        df_prices = get_stock_data(stock_symbol)
+        
+        st.markdown('<div class="section-header">Section 1: Daily Prices with Gap Info</div>', unsafe_allow_html=True)
+        st.dataframe(df_prices, use_container_width=True)
+        
+        # Section 2 placeholder (news integration can be added here)
+        st.markdown('<div class="section-header">Section 2: Price Swings & News (Coming Soon)</div>', unsafe_allow_html=True)
+        st.info("News and price swing analysis will be integrated here in future updates.")
+        
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error fetching data for symbol '{stock_symbol}': {e}")
+
+else:
+    st.info("Please enter a stock symbol above.")
