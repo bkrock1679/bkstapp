@@ -91,3 +91,13 @@ if st.button("Get Stock Insights"):
                             st.write("No news found for this date.")
 
                 st.subheader("📰 Live News: Latest Headlines")
+                today_str = datetime.today().strftime('%Y-%m-%d')
+                news_today = get_news_marketaux(symbol, today_str, today_str, marketaux_api_key)
+                if news_today:
+                    for article in news_today:
+                        st.markdown(f"- [{article['title']}]({article['url']})")
+                else:
+                    st.write("No recent news found today.")
+
+    except Exception as e:
+        st.error(f"Error: {e}")
