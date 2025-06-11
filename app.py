@@ -41,13 +41,12 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Create two columns, left wider than right
-            col1, col2 = st.columns([3, 2])
+            col1, col2 = st.columns([5, 2])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
-                st.dataframe(hist[::-1], use_container_width=True)
+                st.dataframe(hist[::-1], use_container_width=True, height=600)
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
