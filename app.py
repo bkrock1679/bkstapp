@@ -65,7 +65,10 @@ if st.button("Get Stock Insights"):
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                st.table(hist[::-1].style.format("{:.2f}"))
+                styled_hist = hist[::-1].style.format("{:.2f}").set_table_styles(
+                    [{'selector': 'td', 'props': [('text-align', 'center')]}]
+                )
+                st.table(styled_hist)
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
