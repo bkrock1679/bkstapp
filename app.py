@@ -26,6 +26,9 @@ try:
         data = data[['Open', 'High', 'Low', 'Close']].copy()
         data.reset_index(inplace=True)
 
+        # Ensure Date is datetime
+        data['Date'] = pd.to_datetime(data['Date'])
+
         # Calculate Previous Close and Gap
         data['Prev Close'] = data['Close'].shift(1)
         data['Gap ($)'] = data['Open'] - data['Prev Close']
@@ -55,7 +58,10 @@ try:
         base_url = "https://newsapi.org/v2/everything"
 
         for _, row in significant_swings.iterrows():
-            date_str = row['Date'].strftime('%Y-%m-%d')
+            # Make sure date is in datetime format
+            row_date = pd.to_datetime(row['Date'])
+            date_str = row_date.strftime('%Y-%m-%d')
+
             st.subheader(f"🗓️ {date_str} — {row['Daily Change %']:.2f}% {'🔺' if row['Daily Change %'] > 0 else '🔻'}")
             st.write(f"**Close Price:** {row['Close']:.2f}  |  **Previous Close:** {row['Prev Close']:.2f}")
 
