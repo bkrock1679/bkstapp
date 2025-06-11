@@ -11,7 +11,7 @@ st.markdown(
     """
     <style>
     .scroll-table {
-        max-height: 400px;  /* Adjust height as needed */
+        max-height: 400px;
         overflow-y: auto;
         border: 1px solid #ddd;
         padding: 5px;
@@ -58,23 +58,18 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Two columns with 60% / 40% widths
             col1, col2 = st.columns([6, 4])
 
-           with col1:
+            with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-
-                hist = hist.copy()  # avoid modifying original DataFrame elsewhere
+                hist = hist.copy()
                 hist['Day'] = hist.index.to_series().apply(lambda d: d.strftime('%A'))
-                hist.index = hist.index.date  # just the date in the index
-
-                # Move the Day column to the front
+                hist.index = hist.index.date
                 hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
 
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
                 st.table(hist[::-1].style.format("{:.2f}"))
                 st.markdown('</div>', unsafe_allow_html=True)
-
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
