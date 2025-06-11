@@ -4,78 +4,73 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Stock Gap Analyzer", layout="wide")
-st.title("📈 Stock Gap Analyzer with News")
+st.set_page_config(page_title="Stock Insights Tool", layout="centered")
 
-symbol = st.sidebar.text_input("Enter Stock Symbol (e.g., AAPL, NVDA):", "AAPL")
+st.title("📈 Stock Insights — 6-Week Snapshot with News")
+symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
-end_date = datetime.today()
-start_date = end_date - timedelta(weeks=6)
+# NewsAPI setup
+news_api_key = st.secrets["newsapi"]["key"]
+news_url = "https://newsapi.org/v2/everything"
 
-st.header("Section 1: Daily Prices & Gap Analysis")
-
-try:
-    data = yf.download(symbol, start=start_date, end=end_date)
-    if data.empty:
-        st.error("No data found. Please check the stock symbol.")
+def get_news(query, from_date, to_date):
+    params = {
+        "q": query,
+        "from": from_date,
+        "to": to_date,
+        "language": "en",
+        "sortBy": "relevancy",
+        "apiKey": news_api_key,
+        "pageSize": 5,
+    }
+    response = requests.get(news_url, params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
     else:
-        data = data[['Open', 'High', 'Low', 'Close']].copy()
-        data.reset_index(inplace=True)
+        return []
 
-        # Ensure Date is datetime dtype
-        data['Date'] = pd.to_datetime(data['Date'])
+if st.button("Get Stock Insights"):
+    try:
+        end_date = datetime.today()
+        start_date = end_date - timedelta(weeks=6)
 
-        # Calculate previous close (for reference only, no Gap calculation)
-        data['Prev Close'] = data['Close'].shift(1)
+        stock = yf.Ticker(symbol)
+        hist = stock.history(start=start_date, end=end_date)
+        hist = hist[['Open', 'High', 'Low', 'Close']].round(2)
 
-        data = data.sort_values('Date', ascending=False)
+        if hist.empty:
+            st.error("No data found for this symbol.")
+        else:
+            st.subheader("📊 Section 1: Daily Prices (Recent First)")
+            hist.index = hist.index.date
+            st.dataframe(hist[::-1], use_container_width=True)
 
-        st.dataframe(
-            data[['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close']]
-            .style.set_properties(**{'text-align': 'center'}),
-            use_container_width=True
-        )
+            st.subheader("⚠️ Section 2: Volatility & Related News")
+            hist['% Change'] = hist['Close'].pct_change() * 100
+            spikes = hist[hist['% Change'].abs() > 5].copy()
+            spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
+            spikes = spikes[['% Change', 'Direction']].round(2)
 
-except Exception as e:
-    st.error(f"Error loading data: {e}")
+            if spikes.empty:
+                st.info("No major price swings (>5%) in the last 6 weeks.")
+            else:
+                for date, row in spikes[::-1].iterrows():
+                    st.write(f"### {date} — {row['Direction']}ward move of {row['% Change']}%")
+                    headlines = get_news(symbol, date.strftime('%Y-%m-%d'), date.strftime('%Y-%m-%d'))
+                    if headlines:
+                        for article in headlines:
+                            st.markdown(f"- [{article['title']}]({article['url']})")
+                    else:
+                        st.write("No news found for this date.")
 
-st.header("Section 2: Price Swings & News")
-
-try:
-    data['Daily Change %'] = data['Close'].pct_change() * 100
-    significant_swings = data[abs(data['Daily Change %']) > 3]
-
-    if not significant_swings.empty:
-        news_api_key = st.secrets["newsapi"]["key"]
-        base_url = "https://newsapi.org/v2/everything"
-
-        for _, row in significant_swings.iterrows():
-            date_str = pd.to_datetime(row['Date']).strftime('%Y-%m-%d')
-
-            st.subheader(f"🗓️ {date_str} — {row['Daily Change %']:.2f}% {'🔺' if row['Daily Change %'] > 0 else '🔻'}")
-            st.write(f"**Close Price:** {row['Close']:.2f}  |  **Previous Close:** {row['Prev Close']:.2f}")
-
-            params = {
-                'q': symbol,
-                'from': date_str,
-                'to': date_str,
-                'sortBy': 'relevancy',
-                'apiKey': news_api_key,
-                'language': 'en',
-                'pageSize': 5
-            }
-            response = requests.get(base_url, params=params)
-            articles = response.json().get('articles', [])
-
-            if articles:
-                for article in articles:
+            st.subheader("📰 Live News: Latest Headlines")
+            today_str = datetime.today().strftime('%Y-%m-%d')
+            news_today = get_news(symbol, today_str, today_str)
+            if news_today:
+                for article in news_today:
                     st.markdown(f"- [{article['title']}]({article['url']})")
             else:
-                st.write("No significant news found on this day.")
-    else:
-        st.info("No significant price swings (> 3%) in the last 6 weeks.")
+                st.write("No recent news found today.")
 
-except Exception as e:
-    st.error(f"Error fetching news or analyzing swings: {e}")
-
-st.caption("Note: Data from Yahoo Finance. News powered by NewsAPI.org")
+    except Exception as e:
+        st.error(f"Error: {e}")
