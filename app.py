@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS for compact scrollable table
+# CSS to reduce spacing and improve table compactness
 st.markdown(
     """
     <style>
@@ -17,14 +17,14 @@ st.markdown(
         padding: 0px;
         margin: 0px;
     }
-    table {
+    .scroll-table table {
         width: auto !important;
         border-collapse: collapse;
-        margin: 0px !important;
+        font-size: 14px;
     }
-    th, td {
-        text-align: center !important;
-        padding: 4px 8px !important;
+    .scroll-table th, .scroll-table td {
+        text-align: center;
+        padding: 4px 6px !important;
         white-space: nowrap;
     }
     </style>
@@ -69,18 +69,20 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Add Day column
+            # Add Day of week
             hist['Day'] = hist.index.strftime('%A')
             hist.index = hist.index.date
             hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
 
-            # Two columns: Prices (left), News (right)
+            # Two-column layout
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                st.table(hist[::-1].style.format("{:.2f}", subset=["Open", "High", "Low", "Close"]))
+                styled_table = hist[::-1].style.format("{:.2f}", subset=["Open", "High", "Low", "Close"])\
+                    .set_properties(**{'text-align': 'center'})
+                st.dataframe(styled_table, height=400, use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
