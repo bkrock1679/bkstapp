@@ -22,30 +22,16 @@ try:
         data = data[['Open', 'High', 'Low', 'Close']].copy()
         data.reset_index(inplace=True)
 
-        # Debugging info
-        st.write("Type of data['Open']:", type(data['Open']))
-        st.write("Type of data['Prev Close'] (before shift): Not set yet")
-        
         # Ensure Date is datetime dtype
         data['Date'] = pd.to_datetime(data['Date'])
 
-        # Calculate previous close and gap
+        # Calculate previous close (for reference only, no Gap calculation)
         data['Prev Close'] = data['Close'].shift(1)
-
-        # Debugging info
-        st.write("Type of data['Prev Close'] after shift:", type(data['Prev Close']))
-        st.write("data['Open'].shape:", data['Open'].shape)
-        st.write("data['Prev Close'].shape:", data['Prev Close'].shape)
-
-        data['Gap ($)'] = data['Open'] - data['Prev Close']
-
-        data['Gap Direction'] = data['Gap ($)'].apply(
-            lambda x: 'Gap Up' if x > 0 else ('Gap Down' if x < 0 else 'No Gap'))
 
         data = data.sort_values('Date', ascending=False)
 
         st.dataframe(
-            data[['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close', 'Gap ($)', 'Gap Direction']]
+            data[['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close']]
             .style.set_properties(**{'text-align': 'center'}),
             use_container_width=True
         )
