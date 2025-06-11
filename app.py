@@ -1,88 +1,77 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
 import requests
+from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Stock Gap Analyzer", layout="wide")
-st.title("📈 Stock Gap Analyzer with News")
+st.set_page_config(page_title="Stock Insights Tool", layout="centered")
 
-# Sidebar Input
-symbol = st.sidebar.text_input("Enter Stock Symbol (e.g., AAPL, NVDA):", "AAPL")
+st.title("📈 Stock Insights — 6-Week Snapshot with News")
+symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
-# Date setup
-end_date = datetime.today()
-start_date = end_date - timedelta(weeks=6)
+# NewsAPI setup
+news_api_key = st.secrets["newsapi"]["key"]
+news_url = "https://newsapi.org/v2/everything"
 
-# Section 1: Price Table with Gap Calculation
-st.header("Section 1: Daily Prices & Gap Analysis")
-
-try:
-    data = yf.download(symbol, start=start_date, end=end_date)
-    if data.empty:
-        st.error("No data found. Please check the stock symbol.")
+def get_news(query, from_date, to_date):
+    params = {
+        "q": query,
+        "from": from_date,
+        "to": to_date,
+        "language": "en",
+        "sortBy": "relevancy",
+        "apiKey": news_api_key,
+        "pageSize": 5,
+    }
+    response = requests.get(news_url, params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
     else:
-        data = data[['Open', 'High', 'Low', 'Close']].copy()
-        data.reset_index(inplace=True)
+        return []
 
-        # Calculate Previous Close and Gap
-        data['Prev Close'] = data['Close'].shift(1)
-        data['Gap ($)'] = data['Open'] - data['Prev Close']
-        data['Gap Direction'] = data['Gap ($)'].apply(lambda x: 'Gap Up' if x > 0 else ('Gap Down' if x < 0 else 'No Gap'))
+if st.button("Get Stock Insights"):
+    try:
+        end_date = datetime.today()
+        start_date = end_date - timedelta(weeks=6)
 
-        # Reorder by most recent first
-        data = data.sort_values(by='Date', ascending=False)
+        stock = yf.Ticker(symbol)
+        hist = stock.history(start=start_date, end=end_date)
+        hist = hist[['Open', 'High', 'Low', 'Close']].round(2)
 
-        # Format columns and center-align
-        styled_data = data[['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close', 'Gap ($)', 'Gap Direction']]
-        styled_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close', 'Gap ($)', 'Gap Direction']
-        st.dataframe(styled_data.style.set_properties(**{'text-align': 'center'}), use_container_width=True)
+        if hist.empty:
+            st.error("No data found for this symbol.")
+        else:
+            st.subheader("📊 Section 1: Daily Prices (Recent First)")
+            hist.index = hist.index.date
+            st.dataframe(hist[::-1], use_container_width=True)
 
-except Exception as e:
-    st.error(f"Error loading data: {e}")
+            st.subheader("⚠️ Section 2: Volatility & Related News")
+            hist['% Change'] = hist['Close'].pct_change() * 100
+            spikes = hist[hist['% Change'].abs() > 5].copy()
+            spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
+            spikes = spikes[['% Change', 'Direction']].round(2)
 
-# Section 2: Price Swings & News Analysis
-st.header("Section 2: Price Swings & News")
+            if spikes.empty:
+                st.info("No major price swings (>5%) in the last 6 weeks.")
+            else:
+                for date, row in spikes[::-1].iterrows():
+                    date_str = date.isoformat()  # Convert date to string 'YYYY-MM-DD'
+                    st.write(f"### {date_str} — {row['Direction']}ward move of {row['% Change']}%")
+                    headlines = get_news(symbol, date_str, date_str)
+                    if headlines:
+                        for article in headlines:
+                            st.markdown(f"- [{article['title']}]({article['url']})")
+                    else:
+                        st.write("No news found for this date.")
 
-try:
-    # Identify significant swings (e.g., >3% up or down)
-    data['Daily Change %'] = data['Close'].pct_change() * 100
-    significant_swings = data[abs(data['Daily Change %']) > 3]
-
-    if not significant_swings.empty:
-        news_api_key = st.secrets["newsapi"]["key"]
-        base_url = "https://newsapi.org/v2/everything"
-
-        for _, row in significant_swings.iterrows():
-            date_str = row['Date'].strftime('%Y-%m-%d')
-            from_date = (row['Date'] - timedelta(days=1)).strftime('%Y-%m-%d')
-            to_date = row['Date'].strftime('%Y-%m-%d')
-
-            st.subheader(f"🗓️ {date_str} — {row['Daily Change %']:.2f}% {'🔺' if row['Daily Change %'] > 0 else '🔻'}")
-            st.write(f"**Close Price:** {row['Close']:.2f}  |  **Previous Close:** {row['Prev Close']:.2f}")
-
-            params = {
-                'q': symbol,
-                'from': from_date,
-                'to': to_date,
-                'sortBy': 'relevancy',
-                'apiKey': news_api_key,
-                'language': 'en',
-                'pageSize': 5
-            }
-            response = requests.get(base_url, params=params)
-            articles = response.json().get('articles', [])
-
-            if articles:
-                for article in articles:
+            st.subheader("📰 Live News: Latest Headlines")
+            today_str = datetime.today().strftime('%Y-%m-%d')
+            news_today = get_news(symbol, today_str, today_str)
+            if news_today:
+                for article in news_today:
                     st.markdown(f"- [{article['title']}]({article['url']})")
             else:
-                st.write("No significant news found on this day.")
-    else:
-        st.info("No significant price swings (> 3%) in the last 6 weeks.")
+                st.write("No recent news found today.")
 
-except Exception as e:
-    st.error(f"Error fetching news or analyzing swings: {e}")
-
-st.caption("Note: Data from Yahoo Finance. News powered by NewsAPI.org")
+    except Exception as e:
+        st.error(f"Error: {e}")
