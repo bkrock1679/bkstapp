@@ -61,12 +61,20 @@ if st.button("Get Stock Insights"):
             # Two columns with 60% / 40% widths
             col1, col2 = st.columns([6, 4])
 
-            with col1:
+           with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-                hist.index = [f"{d.strftime('%Y-%m-%d')} ({d.strftime('%A')})" for d in hist.index]
+
+                hist = hist.copy()  # avoid modifying original DataFrame elsewhere
+                hist['Day'] = hist.index.to_series().apply(lambda d: d.strftime('%A'))
+                hist.index = hist.index.date  # just the date in the index
+
+                # Move the Day column to the front
+                hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
+
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
                 st.table(hist[::-1].style.format("{:.2f}"))
                 st.markdown('</div>', unsafe_allow_html=True)
+
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
