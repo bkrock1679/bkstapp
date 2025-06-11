@@ -61,15 +61,13 @@ if st.button("Get Stock Insights"):
             # Two columns with 60% / 40% widths
             col1, col2 = st.columns([6, 4])
 
-           with col1:
+            with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
-                    styled_hist = hist[::-1].style.format("{:.2f}").set_table_styles(
-                        [{'selector': 'td', 'props': [('text-align', 'center')]}]
+                styled_hist = hist[::-1].style.format("{:.2f}").set_table_styles(
+                    [{'selector': 'td', 'props': [('text-align', 'center')]}]
                 )
                 st.dataframe(styled_hist, height=400)
-
-
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
