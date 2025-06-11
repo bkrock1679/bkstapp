@@ -46,7 +46,7 @@ if st.button("Get Stock Insights"):
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
-                st.dataframe(hist[::-1], use_container_width=True, height=600)
+                st.table(hist[::-1])  # Use st.table to show full data without scroll
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
