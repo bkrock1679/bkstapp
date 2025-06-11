@@ -6,25 +6,26 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS to reduce spacing and improve table compactness
+# CSS to control table width, padding, and center alignment without vertical scrolling inside table
 st.markdown(
     """
     <style>
-    .scroll-table {
-        max-height: 400px;
-        overflow-y: auto;
-        border: 1px solid #ccc;
-        padding: 0px;
-        margin: 0px;
+    /* Container for table */
+    .table-container {
+        max-width: 700px;  /* Adjust max width as needed */
+        margin: 0;
+        padding: 0;
     }
-    .scroll-table table {
-        width: auto !important;
+    /* Table style */
+    .table-container table {
         border-collapse: collapse;
+        width: 100%;
         font-size: 14px;
     }
-    .scroll-table th, .scroll-table td {
+    .table-container th, .table-container td {
+        border: 1px solid #ddd;
         text-align: center;
-        padding: 4px 6px !important;
+        padding: 6px 8px;
         white-space: nowrap;
     }
     </style>
@@ -35,7 +36,6 @@ st.markdown(
 st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
-# Marketaux API key from Streamlit secrets
 marketaux_api_key = st.secrets["marketaux"]["key"]
 
 def get_news_marketaux(symbol, from_date, to_date, api_key):
@@ -69,21 +69,18 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Add Day of week
             hist['Day'] = hist.index.strftime('%A')
             hist.index = hist.index.date
             hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
 
-            # Two-column layout
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-                st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                styled_table = hist[::-1].style.format("{:.2f}", subset=["Open", "High", "Low", "Close"])\
-                    .set_properties(**{'text-align': 'center'})
-                st.dataframe(styled_table, height=400, use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
+                # Convert styled dataframe to HTML with container div
+                styled_table = hist[::-1].style.format("{:.2f}").set_properties(**{'text-align': 'center'})
+                html = styled_table.render()
+                st.markdown(f'<div class="table-container">{html}</div>', unsafe_allow_html=True)
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
