@@ -44,7 +44,7 @@ if st.button("Get Stock Insights"):
             st.error("No data found for this symbol.")
         else:
             # Create two columns, left and right
-            col1, col2 = st.columns([4, 6])
+            col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
