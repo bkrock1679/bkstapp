@@ -6,27 +6,15 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS to control table width, padding, and center alignment without vertical scrolling inside table
+# CSS for scrollable fixed-height container
 st.markdown(
     """
     <style>
-    /* Container for table */
-    .table-container {
-        max-width: 700px;  /* Adjust max width as needed */
-        margin: 0;
-        padding: 0;
-    }
-    /* Table style */
-    .table-container table {
-        border-collapse: collapse;
-        width: 100%;
-        font-size: 14px;
-    }
-    .table-container th, .table-container td {
+    .scroll-table {
+        max-height: 400px;
+        overflow-y: auto;
         border: 1px solid #ddd;
-        text-align: center;
-        padding: 6px 8px;
-        white-space: nowrap;
+        padding: 5px;
     }
     </style>
     """,
@@ -36,6 +24,7 @@ st.markdown(
 st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
+# Marketaux API key from Streamlit secrets
 marketaux_api_key = st.secrets["marketaux"]["key"]
 
 def get_news_marketaux(symbol, from_date, to_date, api_key):
@@ -69,18 +58,23 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            hist['Day'] = hist.index.strftime('%A')
+            # Add "Day" column and reorder
             hist.index = hist.index.date
+            hist['Day'] = [datetime.strptime(str(d), "%Y-%m-%d").strftime("%A") for d in hist.index]
             hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
 
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-                # Convert styled dataframe to HTML with container div
-                styled_table = hist[::-1].style.format("{:.2f}").set_properties(**{'text-align': 'center'})
-                html = styled_table.render()
-                st.markdown(f'<div class="table-container">{html}</div>', unsafe_allow_html=True)
+                st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
+                st.table(hist[::-1].style.format({
+                    'Open': "{:.2f}",
+                    'High': "{:.2f}",
+                    'Low': "{:.2f}",
+                    'Close': "{:.2f}"
+                }))
+                st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
