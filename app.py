@@ -6,12 +6,12 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS to make the stock prices table scrollable with fixed max height
+# CSS for scrollable fixed-height container
 st.markdown(
     """
     <style>
     .scroll-table {
-        max-height: 400px;  /* Adjust this height as needed */
+        max-height: 400px;  /* Adjust height as needed */
         overflow-y: auto;
         border: 1px solid #ddd;
         padding: 5px;
@@ -58,14 +58,14 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Create two columns with 60% width left and 40% right
+            # Two columns with 60% / 40% widths
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                st.dataframe(hist[::-1], use_container_width=True)
+                st.table(hist[::-1])
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
@@ -78,7 +78,6 @@ if st.button("Get Stock Insights"):
                 if spikes.empty:
                     st.info("No major price swings (>5%) in the last 6 weeks.")
                 else:
-                    # To save API calls, only fetch news for the most recent spike
                     recent_spike = spikes.tail(1)
                     for date, row in recent_spike[::-1].iterrows():
                         date_str = date.isoformat()
@@ -92,13 +91,3 @@ if st.button("Get Stock Insights"):
                             st.write("No news found for this date.")
 
                 st.subheader("📰 Live News: Latest Headlines")
-                today_str = datetime.today().strftime('%Y-%m-%d')
-                news_today = get_news_marketaux(symbol, today_str, today_str, marketaux_api_key)
-                if news_today:
-                    for article in news_today:
-                        st.markdown(f"- [{article['title']}]({article['url']})")
-                else:
-                    st.write("No recent news found today.")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
