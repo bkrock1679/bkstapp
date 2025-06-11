@@ -58,17 +58,22 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
+            # Add "Day" column and reorder
+            hist.index = hist.index.date
+            hist['Day'] = [datetime.strptime(str(d), "%Y-%m-%d").strftime("%A") for d in hist.index]
+            hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
+
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-                hist = hist.copy()
-                hist['Day'] = hist.index.to_series().apply(lambda d: d.strftime('%A'))
-                hist.index = hist.index.date
-                hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
-
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                st.table(hist[::-1].style.format("{:.2f}"))
+                st.table(hist[::-1].style.format({
+                    'Open': "{:.2f}",
+                    'High': "{:.2f}",
+                    'Low': "{:.2f}",
+                    'Close': "{:.2f}"
+                }))
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
