@@ -1,99 +1,85 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import requests
 
-st.set_page_config(page_title="Stock Dashboard", layout="wide")
+st.set_page_config(page_title="Stock Gap Analyzer", layout="wide")
+st.title("📈 Stock Gap Analyzer with News")
 
-# --- Styling ---
-st.markdown(
-    """
-    <style>
-    .stApp { background-color: #f7fbff; }
-    .title { color: #005b96; font-size: 36px; font-weight: 700; text-align: center; padding: 20px 0; }
-    .section-header { color: #004080; font-size: 24px; font-weight: 600; margin-top: 30px; }
-    .dataframe td, .dataframe th { text-align: center !important; }
-    .dataframe th { background-color: #d0e6f7 !important; }
-    .dataframe td { background-color: #eef6fb !important; }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# Sidebar Input
+symbol = st.sidebar.text_input("Enter Stock Symbol (e.g., AAPL, NVDA):", "AAPL")
 
-# --- Gap Calculation ---
-def add_gap_columns(df):
-    df = df.copy()
-    df["PrevClose"] = df["Close"].shift(1)
-    df["Gap"] = df["Open"] - df["PrevClose"]
-    df["GapDirection"] = df["Gap"].apply(lambda x: "Gap Up" if x > 0 else ("Gap Down" if x < 0 else "No Gap"))
-    df.drop(columns=["PrevClose"], inplace=True)
-    return df
+# Date setup
+end_date = datetime.today()
+start_date = end_date - timedelta(weeks=6)
 
-# --- Get Stock Data ---
-def get_stock_data(symbol, weeks=6):
-    end_date = datetime.today()
-    start_date = end_date - timedelta(weeks=weeks)
-    df = yf.Ticker(symbol).history(start=start_date, end=end_date, interval="1d")
-    df.reset_index(inplace=True)
-    df = df[["Date", "Open", "High", "Low", "Close"]]
-    df = df.iloc[::-1].reset_index(drop=True)
-    df = add_gap_columns(df)
-    df["Date"] = df["Date"].dt.strftime("%Y-%m-%d")
-    for col in ["Open", "High", "Low", "Close", "Gap"]:
-        df[col] = df[col].round(2)
-    return df
+# Section 1: Price Table with Gap Calculation
+st.header("Section 1: Daily Prices & Gap Analysis")
 
-# --- Get News from NewsAPI ---
-def get_news(symbol, from_date):
-    api_key = st.secrets["newsapi"]["key"]
-    url = f"https://newsapi.org/v2/everything?q={symbol}&from={from_date}&sortBy=publishedAt&apiKey={api_key}&language=en"
-    response = requests.get(url)
-    articles = response.json().get("articles", [])
-    headlines = []
-    for article in articles[:10]:
-        headlines.append(f"- [{article['title']}]({article['url']})")
-    return headlines
+try:
+    data = yf.download(symbol, start=start_date, end=end_date)
+    if data.empty:
+        st.error("No data found. Please check the stock symbol.")
+    else:
+        data = data[['Open', 'High', 'Low', 'Close']].copy()
+        data.reset_index(inplace=True)
 
-# --- Detect Price Swings ---
-def detect_swings(df, threshold_percent=3):
-    swings = []
-    for i in range(1, len(df)):
-        prev_close = df.loc[i - 1, "Close"]
-        current_close = df.loc[i, "Close"]
-        change = ((current_close - prev_close) / prev_close) * 100
-        if abs(change) >= threshold_percent:
-            swings.append((df.loc[i, "Date"], round(change, 2)))
-    return swings
+        # Calculate Previous Close and Gap
+        data['Prev Close'] = data['Close'].shift(1)
+        data['Gap ($)'] = data['Open'] - data['Prev Close']
+        data['Gap Direction'] = data['Gap ($)'].apply(lambda x: 'Gap Up' if x > 0 else ('Gap Down' if x < 0 else 'No Gap'))
 
-# --- App UI ---
-st.markdown('<div class="title">Stock Price Gap & News Dashboard</div>', unsafe_allow_html=True)
+        # Reorder by most recent first
+        data = data.sort_values(by='Date', ascending=False)
 
-symbol = st.text_input("Enter Stock Symbol (e.g., AMZN, AAPL, TSLA):", value="AAPL").upper()
+        # Format columns and center-align
+        styled_data = data[['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close', 'Gap ($)', 'Gap Direction']]
+        styled_data.columns = ['Date', 'Open', 'High', 'Low', 'Close', 'Prev Close', 'Gap ($)', 'Gap Direction']
+        st.dataframe(styled_data.style.set_properties(**{'text-align': 'center'}), use_container_width=True)
 
-if symbol:
-    try:
-        df = get_stock_data(symbol)
-        st.markdown('<div class="section-header">Section 1: Daily Prices with Gap Info</div>', unsafe_allow_html=True)
-        st.dataframe(df, use_container_width=True)
+except Exception as e:
+    st.error(f"Error loading data: {e}")
 
-        st.markdown('<div class="section-header">Section 2: Significant Price Swings & Related News</div>', unsafe_allow_html=True)
-        
-        swings = detect_swings(df)
-        if swings:
-            for date, change in swings:
-                direction = "▲" if change > 0 else "▼"
-                st.write(f"**{date}**: {direction} {abs(change)}% change")
-                news_headlines = get_news(symbol, date)
-                if news_headlines:
-                    for item in news_headlines:
-                        st.markdown(item)
-                else:
-                    st.write("_No relevant news found._")
-        else:
-            st.info("No significant price swings (±3%) in the last 6 weeks.")
+# Section 2: Price Swings & News Analysis
+st.header("Section 2: Price Swings & News")
 
-    except Exception as e:
-        st.error(f"Error: {e}")
-else:
-    st.info("Please enter a stock symbol above.")
+try:
+    # Identify significant swings (e.g., >3% up or down)
+    data['Daily Change %'] = data['Close'].pct_change() * 100
+    significant_swings = data[abs(data['Daily Change %']) > 3]
+
+    if not significant_swings.empty:
+        news_api_key = st.secrets["newsapi"]["key"]
+        base_url = "https://newsapi.org/v2/everything"
+
+        for _, row in significant_swings.iterrows():
+            date_str = row['Date'].strftime('%Y-%m-%d')
+            st.subheader(f"🗓️ {date_str} — {row['Daily Change %']:.2f}% {'🔺' if row['Daily Change %'] > 0 else '🔻'}")
+            st.write(f"**Close Price:** {row['Close']:.2f}  |  **Previous Close:** {row['Prev Close']:.2f}")
+
+            params = {
+                'q': symbol,
+                'from': date_str,
+                'to': date_str,
+                'sortBy': 'relevancy',
+                'apiKey': news_api_key,
+                'language': 'en',
+                'pageSize': 5
+            }
+            response = requests.get(base_url, params=params)
+            articles = response.json().get('articles', [])
+
+            if articles:
+                for article in articles:
+                    st.markdown(f"- [{article['title']}]({article['url']})")
+            else:
+                st.write("No significant news found on this day.")
+    else:
+        st.info("No significant price swings (> 3%) in the last 6 weeks.")
+
+except Exception as e:
+    st.error(f"Error fetching news or analyzing swings: {e}")
+
+st.caption("Note: Data from Yahoo Finance. News powered by NewsAPI.org")
