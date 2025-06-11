@@ -1,37 +1,51 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import requests
 from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="centered")
 
-st.title("📈 Stock Insights — 6-Week Snapshot")
-st.markdown("Enter a stock symbol (e.g., AAPL, AMZN) to view recent trends and news.")
-
-# User Input
+st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
+
+# NewsAPI setup
+news_api_key = st.secrets["newsapi"]["key"]
+news_url = "https://newsapi.org/v2/everything"
+
+def get_news(query, from_date, to_date):
+    params = {
+        "q": query,
+        "from": from_date,
+        "to": to_date,
+        "language": "en",
+        "sortBy": "relevancy",
+        "apiKey": news_api_key,
+        "pageSize": 5,
+    }
+    response = requests.get(news_url, params=params)
+    if response.status_code == 200:
+        return response.json().get("articles", [])
+    else:
+        return []
 
 if st.button("Get Stock Insights"):
     try:
-        # Time Range
         end_date = datetime.today()
         start_date = end_date - timedelta(weeks=6)
 
-        # Fetch historical data
         stock = yf.Ticker(symbol)
         hist = stock.history(start=start_date, end=end_date)
+        hist = hist[['Open', 'High', 'Low', 'Close']].round(2)
 
         if hist.empty:
-            st.error("No data found for this symbol. Please check the symbol and try again.")
+            st.error("No data found for this symbol.")
         else:
-            st.subheader("📊 Section 1: Daily Price (Last 6 Weeks)")
-            price_df = hist[['Open', 'High', 'Low', 'Close']].round(2)
-            price_df.index = price_df.index.date  # Simplify date format
-            st.dataframe(price_df.tail(30), use_container_width=True)
+            st.subheader("📊 Section 1: Daily Prices (Recent First)")
+            hist.index = hist.index.date
+            st.dataframe(hist[::-1], use_container_width=True)
 
-            st.subheader("⚠️ Section 2: Volatility & Events")
-
-            # Detect large moves > 5%
+            st.subheader("⚠️ Section 2: Volatility & Related News")
             hist['% Change'] = hist['Close'].pct_change() * 100
             spikes = hist[hist['% Change'].abs() > 5].copy()
             spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
@@ -40,12 +54,23 @@ if st.button("Get Stock Insights"):
             if spikes.empty:
                 st.info("No major price swings (>5%) in the last 6 weeks.")
             else:
-                st.write("### Significant Price Swings (>5%)")
-                spikes.index = spikes.index.date
-                st.dataframe(spikes)
+                for date, row in spikes[::-1].iterrows():
+                    st.write(f"### {date} — {row['Direction']}ward move of {row['% Change']}%")
+                    headlines = get_news(symbol, date.strftime('%Y-%m-%d'), date.strftime('%Y-%m-%d'))
+                    if headlines:
+                        for article in headlines:
+                            st.markdown(f"- [{article['title']}]({article['url']})")
+                    else:
+                        st.write("No news found for this date.")
 
-                st.write("### Potential Reasons")
-                st.markdown("Note: News headlines are not integrated yet. Check Yahoo Finance or Google News on these dates for context such as earnings, upgrades, etc.")
+            st.subheader("📰 Live News: Latest Headlines")
+            today_str = datetime.today().strftime('%Y-%m-%d')
+            news_today = get_news(symbol, today_str, today_str)
+            if news_today:
+                for article in news_today:
+                    st.markdown(f"- [{article['title']}]({article['url']})")
+            else:
+                st.write("No recent news found today.")
 
     except Exception as e:
-        st.error(f"Something went wrong: {e}")
+        st.error(f"Error: {e}")
