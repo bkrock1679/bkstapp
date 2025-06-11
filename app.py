@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS for scrollable fixed-height container
+# CSS for scrollable fixed-height container with compact table styles
 st.markdown(
     """
     <style>
@@ -15,6 +15,15 @@ st.markdown(
         overflow-y: auto;
         border: 1px solid #ddd;
         padding: 5px;
+    }
+    table {
+        width: auto !important;
+        border-collapse: collapse;
+    }
+    th, td {
+        text-align: center !important;
+        padding: 4px 8px !important;
+        white-space: nowrap;
     }
     </style>
     """,
@@ -58,7 +67,7 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Add "Day" column and reorder
+            # Add "Day" column
             hist.index = hist.index.date
             hist['Day'] = [datetime.strptime(str(d), "%Y-%m-%d").strftime("%A") for d in hist.index]
             hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
