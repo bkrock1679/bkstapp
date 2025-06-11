@@ -63,7 +63,7 @@ if st.button("Get Stock Insights"):
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
-                hist.index = hist.index.date
+                hist.index = [f"{d.strftime('%Y-%m-%d')} ({d.strftime('%A')})" for d in hist.index]
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
                 st.table(hist[::-1].style.format("{:.2f}"))
                 st.markdown('</div>', unsafe_allow_html=True)
