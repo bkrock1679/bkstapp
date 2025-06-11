@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 from datetime import datetime, timedelta
 
-st.set_page_config(page_title="Stock Insights Tool", layout="centered")
+st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
 st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
@@ -43,40 +43,45 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            st.subheader("📊 Section 1: Daily Prices (Recent First)")
-            hist.index = hist.index.date
-            st.dataframe(hist[::-1], use_container_width=True)
+            # Create two columns, left and right
+            col1, col2 = st.columns(2)
 
-            st.subheader("⚠️ Section 2: Volatility & Related News")
-            hist['% Change'] = hist['Close'].pct_change() * 100
-            spikes = hist[hist['% Change'].abs() > 5].copy()
-            spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
-            spikes = spikes[['% Change', 'Direction']].round(2)
+            with col1:
+                st.subheader("📊 Section 1: Daily Prices (Recent First)")
+                hist.index = hist.index.date
+                st.dataframe(hist[::-1], use_container_width=True)
 
-            if spikes.empty:
-                st.info("No major price swings (>5%) in the last 6 weeks.")
-            else:
-                # To save API calls, only fetch news for the most recent spike
-                recent_spike = spikes.tail(1)
-                for date, row in recent_spike[::-1].iterrows():
-                    date_str = date.isoformat()
-                    next_day_str = (datetime.fromisoformat(date_str) + timedelta(days=1)).strftime('%Y-%m-%d')
-                    st.write(f"### {date_str} — {row['Direction']}ward move of {row['% Change']}%")
-                    headlines = get_news_marketaux(symbol, date_str, next_day_str, marketaux_api_key)
-                    if headlines:
-                        for article in headlines:
-                            st.markdown(f"- [{article['title']}]({article['url']})")
-                    else:
-                        st.write("No news found for this date.")
+            with col2:
+                st.subheader("⚠️ Section 2: Volatility & Related News")
+                hist['% Change'] = hist['Close'].pct_change() * 100
+                spikes = hist[hist['% Change'].abs() > 5].copy()
+                spikes['Direction'] = spikes['% Change'].apply(lambda x: 'Up' if x > 0 else 'Down')
+                spikes = spikes[['% Change', 'Direction']].round(2)
 
-            st.subheader("📰 Live News: Latest Headlines")
-            today_str = datetime.today().strftime('%Y-%m-%d')
-            news_today = get_news_marketaux(symbol, today_str, today_str, marketaux_api_key)
-            if news_today:
-                for article in news_today:
-                    st.markdown(f"- [{article['title']}]({article['url']})")
-            else:
-                st.write("No recent news found today.")
+                if spikes.empty:
+                    st.info("No major price swings (>5%) in the last 6 weeks.")
+                else:
+                    # To save API calls, only fetch news for the most recent spike
+                    recent_spike = spikes.tail(1)
+                    for date, row in recent_spike[::-1].iterrows():
+                        date_str = date.isoformat()
+                        next_day_str = (datetime.fromisoformat(date_str) + timedelta(days=1)).strftime('%Y-%m-%d')
+                        st.write(f"### {date_str} — {row['Direction']}ward move of {row['% Change']}%")
+                        headlines = get_news_marketaux(symbol, date_str, next_day_str, marketaux_api_key)
+                        if headlines:
+                            for article in headlines:
+                                st.markdown(f"- [{article['title']}]({article['url']})")
+                        else:
+                            st.write("No news found for this date.")
+
+                st.subheader("📰 Live News: Latest Headlines")
+                today_str = datetime.today().strftime('%Y-%m-%d')
+                news_today = get_news_marketaux(symbol, today_str, today_str, marketaux_api_key)
+                if news_today:
+                    for article in news_today:
+                        st.markdown(f"- [{article['title']}]({article['url']})")
+                else:
+                    st.write("No recent news found today.")
 
     except Exception as e:
         st.error(f"Error: {e}")
