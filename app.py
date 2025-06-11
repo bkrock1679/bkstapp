@@ -6,19 +6,21 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
-# CSS for scrollable fixed-height container with compact table styles
+# CSS for compact scrollable table
 st.markdown(
     """
     <style>
     .scroll-table {
         max-height: 400px;
         overflow-y: auto;
-        border: 1px solid #ddd;
-        padding: 5px;
+        border: 1px solid #ccc;
+        padding: 0px;
+        margin: 0px;
     }
     table {
         width: auto !important;
         border-collapse: collapse;
+        margin: 0px !important;
     }
     th, td {
         text-align: center !important;
@@ -67,22 +69,18 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Add "Day" column
+            # Add Day column
+            hist['Day'] = hist.index.strftime('%A')
             hist.index = hist.index.date
-            hist['Day'] = [datetime.strptime(str(d), "%Y-%m-%d").strftime("%A") for d in hist.index]
             hist = hist[['Day', 'Open', 'High', 'Low', 'Close']]
 
+            # Two columns: Prices (left), News (right)
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
-                st.table(hist[::-1].style.format({
-                    'Open': "{:.2f}",
-                    'High': "{:.2f}",
-                    'Low': "{:.2f}",
-                    'Close': "{:.2f}"
-                }))
+                st.table(hist[::-1].style.format("{:.2f}", subset=["Open", "High", "Low", "Close"]))
                 st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
