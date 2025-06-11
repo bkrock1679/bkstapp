@@ -6,6 +6,21 @@ from datetime import datetime, timedelta
 
 st.set_page_config(page_title="Stock Insights Tool", layout="wide")
 
+# CSS to make the stock prices table scrollable with fixed max height
+st.markdown(
+    """
+    <style>
+    .scroll-table {
+        max-height: 400px;  /* Adjust this height as needed */
+        overflow-y: auto;
+        border: 1px solid #ddd;
+        padding: 5px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 st.title("📈 Stock Insights — 6-Week Snapshot with News")
 symbol = st.text_input("Enter Stock Symbol", value="AAPL").upper()
 
@@ -43,13 +58,15 @@ if st.button("Get Stock Insights"):
         if hist.empty:
             st.error("No data found for this symbol.")
         else:
-            # Create two columns, left and right
+            # Create two columns with 60% width left and 40% right
             col1, col2 = st.columns([6, 4])
 
             with col1:
                 st.subheader("📊 Section 1: Daily Prices (Recent First)")
                 hist.index = hist.index.date
+                st.markdown('<div class="scroll-table">', unsafe_allow_html=True)
                 st.dataframe(hist[::-1], use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
             with col2:
                 st.subheader("⚠️ Section 2: Volatility & Related News")
