@@ -55,8 +55,9 @@ if st.button("Get Stock Insights"):
                 st.info("No major price swings (>5%) in the last 6 weeks.")
             else:
                 for date, row in spikes[::-1].iterrows():
-                    st.write(f"### {date} — {row['Direction']}ward move of {row['% Change']}%")
-                    headlines = get_news(symbol, date.strftime('%Y-%m-%d'), date.strftime('%Y-%m-%d'))
+                    date_str = date.isoformat()  # Convert date to string 'YYYY-MM-DD'
+                    st.write(f"### {date_str} — {row['Direction']}ward move of {row['% Change']}%")
+                    headlines = get_news(symbol, date_str, date_str)
                     if headlines:
                         for article in headlines:
                             st.markdown(f"- [{article['title']}]({article['url']})")
